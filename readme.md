@@ -1,9 +1,4 @@
-
-
-### adrão Proxy (GOF)
-
-```markdown
-# Padrão Proxy (GOF)
+# Proxy
 
 ## Motivação
 
