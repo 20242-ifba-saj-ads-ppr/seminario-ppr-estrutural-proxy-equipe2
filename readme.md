@@ -6,12 +6,33 @@ Em diversas situações, especialmente em aplicações com alto custo de criaç�
 
 Suponha que estamos desenvolvendo um jogo de RPG onde os jogadores podem explorar um mundo aberto e encontrar diferentes tipos de monstros ao longo da jornada. Alguns desses monstros possuem atributos mais complexos, como habilidades especiais, animações detalhadas e inteligência artificial avançada. Criar todos esses monstros no início do jogo pode sobrecarregar os recursos do sistema e comprometer a experiência do jogador.
 
+```plantuml
+@startuml
+class EntityFactory {
+    + createMonster(prefab: String): Monster
+}
+
+class Monster {
+    + prefab: String
+    + name: String
+    + maxhealth: int
+    + damage: int
+    + details(): void
+}
+
+class Game {
+    + monsters: List<Monster>
+    + loadMonsters(): void
+}
+
+EntityFactory --> Monster : cria
+Game --> Monster : carrega todos
+@enduml
+
 Com a implementação do padrão Proxy, podemos adotar uma abordagem mais eficiente: 
 - Inicialmente, criamos apenas um objeto Proxy que representa cada monstro, sem carregá-lo completamente na memória.
 - Somente quando o jogador interage com um monstro (por exemplo, ao se aproximar ou atacar), a instância real do monstro é criada e seus detalhes são carregados.
 - Essa estratégia reduz significativamente o uso de memória e processamento, tornando o jogo mais fluido e escalável.
-
-## Estrutura
 
 
 ```plantuml
@@ -46,6 +67,11 @@ EntityFactory --> MonsterProxy : cria
 EntityFactory --> Monster : cria
 @enduml
 ```
+
+## Estrutura
+![image](https://github.com/user-attachments/assets/ab038f90-abbc-462b-a065-cf4b3e71671b)
+
+
 
 ## Solução
 
