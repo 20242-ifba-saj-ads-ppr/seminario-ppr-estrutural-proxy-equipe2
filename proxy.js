@@ -1,14 +1,5 @@
-// Interface comum (Subject)
-class Graphic {
-    details() {
-        throw new Error("Método 'details' deve ser implementado.");
-    }
-}
-
-// Objeto real (RealSubject)
-class Monster extends Graphic {
+class Monster {
     constructor(prefab, name, maxhealth, damage) {
-        super();
         this.prefab = prefab;
         this.name = name;
         this.maxhealth = maxhealth;
@@ -16,33 +7,10 @@ class Monster extends Graphic {
     }
 
     details() {
-        console.log(`[Monster] ${this.prefab} information:\n    Name: ${this.name}\n    Max Health: ${this.maxhealth}\n    Damage: ${this.damage}`);
+        console.log(`[Log] ${this.prefab} information:\n    name: ${this.name}\n    maxhealth: ${this.maxhealth}\n    damage: ${this.damage}`);
     }
 }
 
-// Proxy (ImageProxy)
-class MonsterProxy extends Graphic {
-    constructor(prefab, factory) {
-        super();
-        this.prefab = prefab;
-        this.factory = factory;
-        this.realMonster = null;
-    }
-
-    _initialize() {
-        if (!this.realMonster) {
-            console.log(`[Proxy] Creating real monster instance: ${this.prefab}`);
-            this.realMonster = this.factory.createRealMonster(this.prefab);
-        }
-    }
-
-    details() {
-        this._initialize();
-        this.realMonster.details();
-    }
-}
-
-// Fábrica de Entidades
 class EntityFactory {
     constructor() {
         this.handlePrefabs = {
@@ -52,20 +20,71 @@ class EntityFactory {
         };
     }
 
-    createRealMonster(prefab) {
-        return this.handlePrefabs[prefab]();
-    }
-
-    createMonster(prefab) {
-        return new MonsterProxy(prefab, this);
+    async createMonster(prefab) {
+        console.log(`[Factory] Creating monster: ${prefab}`);
+        return this.handlePrefabs[prefab] ? this.handlePrefabs[prefab]() : null;
     }
 }
 
-// Teste do padrão Proxy
-const factory = new EntityFactory();
-const spiderProxy = factory.createMonster("spider");
-const warriorProxy = factory.createMonster("spider_warrior");
+class ProxyEntityFactory {
+    constructor() {
+        this.realFactory = new EntityFactory();
+        this.monsterCache = {};
+    }
 
-console.log("Chamando detalhes do Proxy:");
-spiderProxy.details();
-warriorProxy.details();
+    // Remote Proxy
+    async simulateRemote(prefab) {
+        console.log(`[Remote Proxy] Fetching monster data remotely for ${prefab}...`);
+        return new Promise(resolve => {
+            setTimeout(() => {
+                console.log(`[Remote Proxy] Data received for ${prefab}.`);
+                resolve();
+            }, 2000);
+        });
+    }
+
+    // Virtual Proxy
+    async createMonster(prefab) {
+        if (!this.monsterCache[prefab]) {
+            await this.simulateRemote(prefab);
+            this.monsterCache[prefab] = await this.realFactory.createMonster(prefab);
+        } else {
+            console.log(`[Virtual Proxy] Returning cached monster: ${prefab}`);
+        }
+        return this.monsterCache[prefab];
+    }
+
+    // Protection Proxy
+    async createProtectedMonster(prefab, userRole) {
+        if (userRole !== 'admin' && prefab === 'spider_hider') {
+            console.log(`[Protection Proxy] Access denied to create ${prefab}. Requires admin privileges.`);
+            return null;
+        }
+        return await this.createMonster(prefab);
+    }
+
+    // Smart Reference Proxy
+    async accessMonster(prefab) {
+        console.log(`[Smart Reference] Monster ${prefab} was accessed.`);
+        return await this.createMonster(prefab);
+    }
+}
+
+(async () => {
+    const proxyFactory = new ProxyEntityFactory();
+
+    console.log("\n[TEST] Creating spider via proxy");
+    const spider = await proxyFactory.createMonster('spider');
+
+    console.log("\n[TEST] Creating spider again to test caching");
+    const spider2 = await proxyFactory.createMonster('spider');
+
+    console.log("\n[TEST] Creating spider_hider with protection proxy (user: guest)");
+    const spiderHider = await proxyFactory.createProtectedMonster('spider_hider', 'guest');
+
+    console.log("\n[TEST] Creating spider_hider with protection proxy (user: admin)");
+    const spiderHiderAdmin = await proxyFactory.createProtectedMonster('spider_hider', 'admin');
+
+    console.log("\n[TEST] Accessing spider via smart reference proxy");
+    await proxyFactory.accessMonster('spider');
+})();
