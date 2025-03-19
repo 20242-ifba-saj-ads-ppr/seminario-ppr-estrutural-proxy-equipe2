@@ -2,9 +2,7 @@
 
 ## Motivação
 
-Em diversas situações, especialmente em aplicações com alto custo de criação de objetos ou que requerem controle de acesso, a criação imediata do objeto real pode ser desnecessária ou custosa. Com o Proxy, é possível adiar a criação do objeto real até o momento em que ele for realmente necessário (lazy initialization), além de permitir o controle de acesso e a inclusão de comportamentos adicionais (como logs) sem modificar a classe real. Imagine a seguir, a criação de monstros em um jogo é gerenciada por um proxy, que adia a instância real do monstro até que seus detalhes sejam solicitados. 
-
-Suponha que estamos desenvolvendo um jogo de RPG onde os jogadores podem explorar um mundo aberto e encontrar diferentes tipos de monstros ao longo da jornada. Alguns desses monstros possuem atributos mais complexos, como habilidades especiais, animações detalhadas e inteligência artificial avançada. Criar todos esses monstros no início do jogo pode sobrecarregar os recursos do sistema e comprometer a experiência do jogador.
+Em aplicações com alto custo de criação de objetos ou que exigem controle de acesso, a criação imediata do objeto real pode ser custosa ou desnecessária. Com o padrão Proxy, podemos adiar a criação do objeto real (lazy initialization), controlar o acesso e adicionar comportamentos complementares (como logs e cache) sem modificar a classe principal. No contexto deste exemplo, a criação de monstros em um jogo é gerenciada por um proxy que simula, de forma assíncrona, operações remotas, caching, controle de acesso e até mesmo registro de acesso (smart reference).
 
 ```plantuml
 @startuml
@@ -37,35 +35,36 @@ Com a implementação do padrão Proxy, podemos adotar uma abordagem mais eficie
 
 ```plantuml
 @startuml
-interface Graphic {
-    + details(): void
-}
+title Diagrama de Classes - Padrão Proxy
 
-class Monster implements Graphic {
-    + prefab: String
-    + name: String
-    + maxhealth: int
-    + damage: int
-    + details(): void
-}
-
-class MonsterProxy implements Graphic {
-    - prefab: String
-    - factory: EntityFactory
-    - realMonster: Monster
-    + details(): void
+class Monster {
+  - prefab: String
+  - name: String
+  - maxhealth: Number
+  - damage: Number
+  + details(): void
 }
 
 class EntityFactory {
-    + createRealMonster(prefab: String): Monster
-    + createMonster(prefab: String): MonsterProxy
+  - handlePrefabs: Object
+  + createMonster(prefab: String): Monster
 }
 
-Graphic <|.. Monster
-Graphic <|.. MonsterProxy
-EntityFactory --> MonsterProxy : cria
+class ProxyEntityFactory {
+  - realFactory: EntityFactory
+  - monsterCache: Object
+  + simulateRemote(prefab: String): Promise
+  + createMonster(prefab: String): Promise
+  + createProtectedMonster(prefab: String, userRole: String): Promise
+  + accessMonster(prefab: String): Promise
+}
+
 EntityFactory --> Monster : cria
+ProxyEntityFactory --> EntityFactory : utiliza
+ProxyEntityFactory --> Monster : cache e retorna
+
 @enduml
+
 ```
 
 ## Estrutura
@@ -83,35 +82,31 @@ A implementação do padrão Proxy permite:
 
 ## Participantes
 
-- **Subject (Graphic):**  
-  Define a interface comum que tanto o RealSubject quanto o Proxy implementam. Garante que o Proxy possa ser usado de forma intercambiável com o RealSubject.
+- **Subject (implícito):**
+As classes que fornecem o método createMonster (no caso, via ProxyEntityFactory) garantem que o cliente possa interagir sem conhecer os detalhes de criação ou controle de acesso.
 
-- **RealSubject (Monster):**  
-  Implementa a lógica principal e contém os dados reais do objeto (por exemplo, informações do monstro, como nome, vida máxima e dano).
+- **RealSubject (Monster):**
+Contém os dados reais do monstro, como prefab, nome, vida máxima e dano, além de fornecer os detalhes via o método details().
 
-- **Proxy (MonsterProxy):**  
-  Controla o acesso ao RealSubject. Neste exemplo, implementa a criação tardia (lazy initialization) do objeto real e adiciona logs para monitoramento dos acessos.
+- **Proxy (ProxyEntityFactory):**
+Implementa diversas funcionalidades:
+  
+- **Remote Proxy: Simula acesso remoto com atraso.** 
+- **Virtual Proxy: Utiliza cache para evitar recriações.**
+- **Protection Proxy: Restringe acesso a tipos sensíveis de monstros.**
+- **Smart Reference Proxy: Registra acessos.**
 
-- **EntityFactory:**  
-  Facilita a criação dos objetos proxy e gerencia a instância real dos objetos quando necessário.
+- **EntityFactory:**
+É responsável pela criação efetiva dos objetos do tipo Monster, armazenando funções de criação (prefabs) para cada tipo.
 
-- **Client:**  
-  Utiliza o proxy como se fosse o objeto real, sem se preocupar com a complexidade da criação e gerenciamento dos objetos.
+- **Client:**
+No exemplo, o client é representado pelo código de teste que instancia o ProxyEntityFactory e realiza chamadas para criar ou acessar monstros, validando os diferentes comportamentos do Proxy.
 
 ## Implementação
 
 ```js
-// Interface comum (Subject)
-class Graphic {
-    details() {
-        throw new Error("Método 'details' deve ser implementado.");
-    }
-}
-
-// Objeto real (RealSubject)
-class Monster extends Graphic {
+class Monster {
     constructor(prefab, name, maxhealth, damage) {
-        super();
         this.prefab = prefab;
         this.name = name;
         this.maxhealth = maxhealth;
@@ -119,36 +114,13 @@ class Monster extends Graphic {
     }
 
     details() {
-        console.log(`[Monster] ${this.prefab} information:
-    Name: ${this.name}
-    Max Health: ${this.maxhealth}
-    Damage: ${this.damage}`);
+        console.log(`[Log] ${this.prefab} information:
+    name: ${this.name}
+    maxhealth: ${this.maxhealth}
+    damage: ${this.damage}`);
     }
 }
 
-// Proxy (MonsterProxy)
-class MonsterProxy extends Graphic {
-    constructor(prefab, factory) {
-        super();
-        this.prefab = prefab;
-        this.factory = factory;
-        this.realMonster = null;
-    }
-
-    _initialize() {
-        if (!this.realMonster) {
-            console.log(`[Proxy] Creating real monster instance: ${this.prefab}`);
-            this.realMonster = this.factory.createRealMonster(this.prefab);
-        }
-    }
-
-    details() {
-        this._initialize();
-        this.realMonster.details();
-    }
-}
-
-// Fábrica de Entidades
 class EntityFactory {
     constructor() {
         this.handlePrefabs = {
@@ -158,23 +130,74 @@ class EntityFactory {
         };
     }
 
-    createRealMonster(prefab) {
-        return this.handlePrefabs[prefab]();
-    }
-
-    createMonster(prefab) {
-        return new MonsterProxy(prefab, this);
+    async createMonster(prefab) {
+        console.log(`[Factory] Creating monster: ${prefab}`);
+        return this.handlePrefabs[prefab] ? this.handlePrefabs[prefab]() : null;
     }
 }
 
-// Teste do padrão Proxy
-const factory = new EntityFactory();
-const spiderProxy = factory.createMonster("spider");
-const warriorProxy = factory.createMonster("spider_warrior");
+class ProxyEntityFactory {
+    constructor() {
+        this.realFactory = new EntityFactory();
+        this.monsterCache = {};
+    }
 
-console.log("Chamando detalhes do Proxy:");
-spiderProxy.details();
-warriorProxy.details();
+    // Remote Proxy: simula uma chamada remota
+    async simulateRemote(prefab) {
+        console.log(`[Remote Proxy] Fetching monster data remotely for ${prefab}...`);
+        return new Promise(resolve => {
+            setTimeout(() => {
+                console.log(`[Remote Proxy] Data received for ${prefab}.`);
+                resolve();
+            }, 2000);
+        });
+    }
+
+    // Virtual Proxy: cria e guarda o monstro para evitar recriações
+    async createMonster(prefab) {
+        if (!this.monsterCache[prefab]) {
+            await this.simulateRemote(prefab);
+            this.monsterCache[prefab] = await this.realFactory.createMonster(prefab);
+        } else {
+            console.log(`[Virtual Proxy] Returning cached monster: ${prefab}`);
+        }
+        return this.monsterCache[prefab];
+    }
+
+    // Protection Proxy: verifica se o usuário tem privilégios para criar certos monstros
+    async createProtectedMonster(prefab, userRole) {
+        if (userRole !== 'admin' && prefab === 'spider_hider') {
+            console.log(`[Protection Proxy] Access denied to create ${prefab}. Requires admin privileges.`);
+            return null;
+        }
+        return await this.createMonster(prefab);
+    }
+
+    // Smart Reference Proxy: registra o acesso ao monstro
+    async accessMonster(prefab) {
+        console.log(`[Smart Reference] Monster ${prefab} was accessed.`);
+        return await this.createMonster(prefab);
+    }
+}
+
+(async () => {
+    const proxyFactory = new ProxyEntityFactory();
+
+    console.log("\n[TEST] Creating spider via proxy");
+    const spider = await proxyFactory.createMonster('spider');
+
+    console.log("\n[TEST] Creating spider again to test caching");
+    const spider2 = await proxyFactory.createMonster('spider');
+
+    console.log("\n[TEST] Creating spider_hider with protection proxy (user: guest)");
+    const spiderHider = await proxyFactory.createProtectedMonster('spider_hider', 'guest');
+
+    console.log("\n[TEST] Creating spider_hider with protection proxy (user: admin)");
+    const spiderHiderAdmin = await proxyFactory.createProtectedMonster('spider_hider', 'admin');
+
+    console.log("\n[TEST] Accessing spider via smart reference proxy");
+    await proxyFactory.accessMonster('spider');
+})();
+
 ```
 
----
